@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>/one-line</title><script src="../../engine/core.js"></script></head>
+<body>
+<script>
+E.register({
+  defaults: {
+    locale: 'pt-BR',
+    duration: 5.5,
+    animate: 3.6,          // segundos até a linha chegar ao fim
+    tag: '/one-line',
+    line1: 'o progresso não é uma linha reta.',
+    line2: 'mas ele ainda sobe.',  // aparece na metade; use null para manter só a primeira
+    theme: 'dark',         // dark (branco no preto) | light (preto no branco)
+    seed: 7,               // muda o desenho das oscilações
+    waves: 3.3,            // quantas subidas e quedas
+    amplitude: 120,        // altura das oscilações em px
+    trend: 'up',           // up | down | flat
+  },
+  setup(s, E) {
+    const R = E.rng(s.seed), ph1 = R() * 6.28, ph2 = R() * 6.28;
+    const A = [150, 1360], B = s.trend === 'down' ? [930, 1360] : s.trend === 'flat' ? [930, 1000] : [930, 640];
+    if (s.trend === 'down') A[1] = 640;
+    if (s.trend === 'flat') A[1] = 1000;
+    const dx = B[0] - A[0], dy = B[1] - A[1], pts = [];
+    for (let i = 0; i <= 600; i++) {
+      const u = i / 600, env = Math.pow(Math.sin(Math.PI * u), .6);
+      const off = env * (s.amplitude * Math.sin(2 * Math.PI * s.waves * u + ph1) + s.amplitude * .3 * Math.sin(2 * Math.PI * s.waves * 2.15 * u + ph2));
+      pts.push([A[0] + dx * u, A[1] + dy * u - off]);
+    }
+    const dark = s.theme !== 'light';
+    return { A, B, pts, bg: dark ? '#0a0a0a' : '#f5f4f0', ink: dark ? '#ffffff' : '#111111', dim: dark ? '#3a3a3a' : '#c8c6c0', dark };
+  },
+  draw(c, t, s, st, E) {
+    c.fillStyle = st.bg; c.fillRect(0, 0, E.W, E.H);
+    E.tag(c, s.tag, st.dark);
+    c.save(); c.strokeStyle = E.alpha(st.ink, .35); c.lineWidth = 3; c.setLineDash([10, 12]);
+    c.beginPath(); c.moveTo(...st.A); c.lineTo(...st.B); c.stroke(); c.restore();
+    const q = E.eio(E.prog(t, .25, s.animate)), n = Math.round(q * (st.pts.length - 1));
+    c.save(); c.strokeStyle = st.ink; c.lineWidth = 8; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(...st.pts[0]); for (let i = 1; i <= n; i++) c.lineTo(...st.pts[i]); c.stroke();
+    const hd = st.pts[n]; c.shadowColor = E.alpha(st.ink, .8); c.shadowBlur = 24; E.circle(c, hd[0], hd[1], 17); c.fillStyle = st.ink; c.fill(); c.restore();
+    const half = .25 + (s.animate - .25) * .5;
+    const a1 = E.prog(t, 0, .4) * (s.line2 ? 1 - E.prog(t, half - .25, half) : 1);
+    const a2 = s.line2 ? E.prog(t, half, half + .45) : 0;
+    if (a1 > 0) E.wrap(c, s.line1, 540, 480, 880, 64, '600 50px Inter', E.alpha(st.ink, a1), 'center');
+    if (a2 > 0) E.wrap(c, s.line2, 540, 480, 880, 64, '600 50px Inter', E.mix(st.dim, st.ink, a2), 'center');
+  },
+});
+</script>
+</body>
+</html>

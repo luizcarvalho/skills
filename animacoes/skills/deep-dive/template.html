@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>/deep-dive</title><script src="../../engine/core.js"></script></head>
+<body>
+<script>
+E.register({
+  defaults: {
+    locale: 'pt-BR',
+    duration: 6,
+    animate: 4,             // segundos da descida
+    tag: '/deep-dive',
+    target: 3800,           // profundidade final (número real)
+    unit: 'm',
+    subtitle: 'abaixo da superfície',
+    finalSubtitle: 'Naufrágio do Titanic, Atlântico Norte', // aparece ao chegar (null = mantém subtitle)
+    markers: [              // marcos no caminho, em ordem crescente, todos menores que target
+      { value: 40, label: 'Limite do mergulho autônomo' },
+      { value: 200, label: 'Fim da luz do sol' },
+      { value: 1000, label: 'Escuridão total' },
+      { value: 2250, label: 'Cachalotes caçam' },
+    ],
+    floor: 'wreck',         // wreck (navio afundado) | seabed (só o fundo) | none
+    vehicle: 'submarine',   // submarine | diver | none
+    colors: { top: '#3f80ad', deep: '#020a14', sky: '#b9d3e3', vehicle: '#f3c11a' },
+  },
+  setup(s, E) {
+    const SUB = 830, GAP = 240, base = s.markers.map((m, i) => 1160 + i * GAP);
+    const endO = SUB - (base.length ? base[base.length - 1] : 1160) - 170;
+    // tabela (deslocamento da régua -> valor no contador): cada marco cruza o veículo no valor exato
+    const keys = [[0, 0], ...s.markers.map((m, i) => [SUB - base[i], m.value]), [endO, s.target]];
+    const R = E.rng(11), snow = []; for (let i = 0; i < 70; i++) snow.push([R() * 1080, R() * 3000, R() * 3 + 2]);
+    return { SUB, base, endO, keys, snow };
+  },
+  draw(c, t, s, st, E) {
+    const p = E.eio(E.prog(t, .25, s.animate)), O = st.endO * p;
+    let D = s.target;
+    for (let i = 0; i < st.keys.length - 1; i++) { const [o0, v0] = st.keys[i], [o1, v1] = st.keys[i + 1]; if (O <= o0 && O >= o1) { D = E.lerp(v0, v1, (o0 - O) / (o0 - o1 || 1)); break; } }
+    const e = D / s.target, surf = 800 + O, col = s.colors;
+    const g = c.createLinearGradient(0, 0, 0, E.H);
+    g.addColorStop(0, E.mix(col.top, '#062547', e)); g.addColorStop(.5, E.mix(E.mix(col.top, '#000000', .3), '#021428', e)); g.addColorStop(1, E.mix(E.mix(col.top, '#000000', .5), col.deep, e));
+    c.fillStyle = g; c.fillRect(0, 0, E.W, E.H);
+    if (surf > 0) {
+      const sg = c.createLinearGradient(0, 0, 0, surf); sg.addColorStop(0, col.sky); sg.addColorStop(1, E.mix(col.sky, col.top, .4));
+      c.fillStyle = sg; c.fillRect(0, 0, E.W, surf); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(0, surf - 3, E.W, 6);
+    }
+    c.fillStyle = 'rgba(255,255,255,0.28)';
+    st.snow.forEach(([x, by, r]) => { const y = ((by + O * .65 - t * 30) % 3000 + 3000) % 3000 - 400; if (y > surf + 10) c.fillRect(x, y, r, r); });
+    if (s.floor !== 'none') {
+      const sb = 2250 - 1250 * E.eout(E.prog(p, .55, 1));
+      if (sb < E.H) {
+        if (s.floor === 'wreck') ship(c, 560, sb + 30, E.mix('#1f3a52', '#2c2a27', E.clamp(e * 1.2)));
+        const fg = c.createLinearGradient(0, sb, 0, sb + 140); fg.addColorStop(0, 'rgba(18,16,12,0)'); fg.addColorStop(.25, '#14110d'); fg.addColorStop(1, '#12100c');
+        c.fillStyle = fg; c.fillRect(0, sb, E.W, E.H - sb);
+      }
+    }
+    s.markers.forEach((m, i) => {
+      const y = st.base[i] + O, a = E.clamp((y - 470) / 70) * E.clamp((E.H + 20 - y) / 80);
+      if (a <= 0) return;
+      c.save(); c.globalAlpha = a; c.strokeStyle = 'rgba(255,255,255,0.4)'; c.lineWidth = 3; c.setLineDash([12, 10]);
+      c.beginPath(); c.moveTo(60, y); c.lineTo(1020, y); c.stroke(); c.setLineDash([]);
+      const v = `${E.num(m.value)} ${s.unit}`;
+      E.T(c, v, 80, y - 22, '700 40px Inter', '#fff');
+      E.T(c, m.label, 92 + E.tw(c, v, '700 40px Inter'), y - 22, '400 36px Inter', 'rgba(255,255,255,0.9)');
+      c.restore();
+    });
+    const sx = 800, sy = st.SUB + 8 * Math.sin(t * 3.2);
+    const la = E.prog(e, .25, .6);
+    if (la > 0 && s.vehicle !== 'none') {
+      c.save(); c.globalAlpha = la;
+      const lg = c.createLinearGradient(0, sy + 40, 0, sy + 760); lg.addColorStop(0, 'rgba(255,226,150,0.55)'); lg.addColorStop(1, 'rgba(255,226,150,0)');
+      c.fillStyle = lg; c.beginPath(); c.moveTo(sx + 10, sy + 50); c.lineTo(sx - 30, sy + 50); c.lineTo(sx - 250, sy + 760); c.lineTo(sx + 160, sy + 760); c.closePath(); c.fill();
+      c.restore();
+    }
+    if (s.vehicle !== 'none') {
+      for (let i = 0; i < 6; i++) {
+        const ph = (t * .9 + i / 6) % 1, bx = sx - 128 + Math.sin(ph * 7 + i) * 10, by = sy - 50 - ph * 230;
+        c.save(); c.globalAlpha = .55 * (1 - ph); c.strokeStyle = '#d8ecff'; c.lineWidth = 3; E.circle(c, bx, by, 6 + (i % 3) * 3); c.stroke(); c.restore();
+      }
+      if (s.vehicle === 'diver') diver(c, sx, sy, col.vehicle, t); else sub(c, sx, sy, col.vehicle, E);
+    }
+    E.tag(c, s.tag, true);
+    E.T(c, `${E.num(Math.round(D))} ${s.unit}`, 72, 440, '800 150px Poppins', '#fff');
+    const fin = s.finalSubtitle ? E.prog(t, s.animate, s.animate + .3) : 0;
+    E.T(c, s.subtitle, 80, 512, '500 44px Inter', `rgba(255,255,255,${.88 * (1 - fin)})`);
+    if (fin > 0) E.T(c, s.finalSubtitle, 80, 512, '500 44px Inter', `rgba(255,255,255,${.88 * fin})`);
+  },
+});
+
+function sub(c, x, y, color, E) {
+  const dk = E.mix(color, '#000000', .2);
+  c.save(); c.translate(x, y);
+  c.fillStyle = dk; c.fillRect(-26, -122, 9, 34); c.fillRect(-26, -122, 26, 9);
+  c.fillStyle = color; E.rr(c, -56, -96, 76, 56, 16); c.fill();
+  c.beginPath(); c.ellipse(0, 0, 132, 66, 0, 0, Math.PI * 2); c.fill();
+  c.save(); c.beginPath(); c.ellipse(0, 0, 132, 66, 0, 0, Math.PI * 2); c.clip(); c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(-140, 22, 280, 60); c.restore();
+  c.fillStyle = dk; E.rr(c, -156, -12, 30, 24, 5); c.fill(); E.rr(c, -166, -36, 10, 72, 4); c.fill();
+  E.circle(c, 44, -4, 31); c.fill();
+  E.circle(c, 44, -4, 21); c.fillStyle = '#163049'; c.fill();
+  E.circle(c, 37, -11, 6); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fill();
+  E.circle(c, 130, 10, 8); c.fillStyle = '#fff'; c.fill();
+  c.restore();
+}
+function diver(c, x, y, color, t) {
+  c.save(); c.translate(x, y); c.rotate(-.25);
+  c.fillStyle = '#1b2733'; c.beginPath(); c.ellipse(0, 0, 110, 30, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = color; c.fillRect(-60, -48, 90, 26);
+  c.fillStyle = '#1b2733'; c.beginPath(); c.arc(118, -4, 30, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#9fd3ff'; c.fillRect(118, -18, 26, 18);
+  const k = Math.sin(t * 8) * 18;
+  c.fillStyle = '#1b2733'; c.save(); c.translate(-105, 0); c.rotate(k * Math.PI / 180); c.fillRect(-70, -8, 70, 16); c.restore();
+  c.restore();
+}
+function ship(c, x, y, col) {
+  c.save(); c.translate(x, y); c.rotate(-.025); c.fillStyle = col;
+  [-250, -120, 10, 140].forEach(fx => { c.beginPath(); c.moveTo(fx, -150); c.lineTo(fx + 8, -262); c.lineTo(fx + 62, -262); c.lineTo(fx + 56, -150); c.fill(); });
+  c.fillRect(-330, -165, 560, 50);
+  c.beginPath(); c.moveTo(-440, -6); c.lineTo(320, -14); c.lineTo(470, -132); c.lineTo(-430, -122); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.10)'; for (let i = 0; i < 18; i++) c.fillRect(-380 + i * 42, -70, 10, 8);
+  c.restore();
+}
+</script>
+</body>
+</html>

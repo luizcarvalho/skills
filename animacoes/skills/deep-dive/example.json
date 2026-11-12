@@ -1,0 +1,21 @@
+{
+  "target": 214,
+  "subtitle": "abaixo da superfície",
+  "finalSubtitle": "Recorde de apneia sem limites",
+  "markers": [
+    {
+      "value": 18,
+      "label": "Mergulho recreativo"
+    },
+    {
+      "value": 40,
+      "label": "Limite do mergulho autônomo"
+    },
+    {
+      "value": 100,
+      "label": "Pressão de 11 atmosferas"
+    }
+  ],
+  "floor": "seabed",
+  "vehicle": "diver"
+}

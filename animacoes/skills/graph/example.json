@@ -1,0 +1,20 @@
+{
+  "title": "Seguidores no Instagram",
+  "values": [
+    1200,
+    3400,
+    9800,
+    31000,
+    100000
+  ],
+  "labels": [
+    "jan",
+    "mar",
+    "mai",
+    "jul",
+    "set"
+  ],
+  "currency": null,
+  "theme": "light",
+  "accent": "#2f6fe0"
+}

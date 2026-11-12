@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>/graph</title><script src="../../engine/core.js"></script></head>
+<body>
+<script>
+E.register({
+  defaults: {
+    locale: 'pt-BR',
+    duration: 6,          // segundos de vídeo
+    animate: 4,           // segundos até o valor final (o resto fica parado no resultado)
+    tag: '/graph',
+    title: 'Um centavo, dobrando todo dia',
+    values: null,         // lista de valores reais, um por ponto. Se null, usa "series".
+    series: { start: 0.01, factor: 2, count: 30 },
+    labels: null,         // rótulos dos pontos (ex.: ["jan", "fev", ...]). Se null: "<xLabel> N"
+    xLabel: 'Dia',
+    currency: 'BRL',      // código ISO (BRL, USD, EUR) ou null para número simples
+    unit: '',             // sufixo quando currency = null (ex.: " seguidores", " kg", "%")
+    decimalsBelow: 1000,  // abaixo desse valor mostra 2 casas decimais
+    theme: 'dark',        // dark | light
+    accent: '#f7c23b',
+    pills: true,          // mostra "primeiro ponto" e "último ponto" no rodapé
+  },
+  setup(s, E) {
+    const v = s.values || Array.from({ length: s.series.count }, (_, i) => s.series.start * Math.pow(s.series.factor, i));
+    const lab = i => s.labels ? s.labels[i] : `${s.xLabel} ${i + 1}`;
+    const fmt = x => {
+      const d = Math.abs(x) < s.decimalsBelow && !Number.isInteger(x) ? 2 : 0;
+      return s.currency ? E.money(d ? x : Math.floor(x), s.currency, d) : E.num(d ? x : Math.round(x), d) + s.unit;
+    };
+    const dark = s.theme !== 'light';
+    return { v, lab, fmt, dark, bg: dark ? '#0c0b0e' : '#f6f4ef', ink: dark ? '#ffffff' : '#141312', sub: dark ? '#8d8a85' : '#77736c', title: dark ? '#c8b78f' : '#7a6a48', big: 140 };
+  },
+  afterFonts(s, st, E) {
+    const w = E.tw(E.ctx, st.fmt(st.v[st.v.length - 1]), '800 140px Poppins');
+    st.big = Math.floor(140 * Math.min(1, 860 / w));
+  },
+  draw(c, t, s, st, E) {
+    const { v } = st, n = v.length;
+    c.fillStyle = st.bg; c.fillRect(0, 0, E.W, E.H);
+    E.tag(c, s.tag, st.dark);
+    const p = E.eio(E.prog(t, .2, s.animate)), d = p * (n - 1);
+    const i = Math.min(n - 2, Math.floor(d)), f = d - i;
+    const cur = n === 1 ? v[0] : (v[i] > 0 && v[i + 1] > 0 && v[i + 1] / v[i] > 1.5 ? v[i] * Math.pow(v[i + 1] / v[i], f) : E.lerp(v[i], v[i + 1], f));
+    E.wrap(c, s.title, 90, 390, 880, 54, '500 44px Inter', st.title);
+    E.T(c, st.fmt(cur), 86, 560, `800 ${st.big}px Poppins`, s.accent);
+    E.T(c, st.lab(Math.round(d)), 90, 630, '500 46px Inter', st.sub);
+    // barras
+    const base = 1300, top = 760, max = Math.max(...v.map(Math.abs)), slot = 900 / n, bw = Math.max(4, slot * .6);
+    for (let k = 0; k < n; k++) {
+      const a = E.clamp(d - k + 1); if (a <= 0) continue;
+      const h = Math.max(5, (base - top) * Math.abs(v[k]) / max) * E.eout(a), x = 90 + k * slot + (slot - bw) / 2;
+      const g = c.createLinearGradient(0, base - h, 0, base); g.addColorStop(0, s.accent); g.addColorStop(1, E.mix(s.accent, st.bg, .45));
+      c.fillStyle = h <= 6 ? E.alpha(s.accent, .75) : g; c.fillRect(x, base - h, bw, h);
+    }
+    c.fillStyle = st.dark ? '#2c2b30' : '#dedad2'; c.fillRect(90, base + 6, 900, 3);
+    const mid = Math.floor((n - 1) / 2);
+    E.T(c, st.lab(0), 90, 1352, '500 34px Inter', st.sub);
+    if (n > 2) E.T(c, st.lab(mid), 90 + mid * slot + slot / 2, 1352, '500 34px Inter', st.sub, 'center');
+    E.T(c, st.lab(n - 1), 990, 1352, '500 34px Inter', st.sub, 'right');
+    if (!s.pills) return;
+    const p1 = E.prog(t, .25, .5);
+    if (p1 > 0) {
+      const txt = `${st.lab(0)}: ${st.fmt(v[0])}`, fnt = '600 38px Inter', w = E.tw(c, txt, fnt) + 64;
+      c.save(); c.globalAlpha = p1; E.rr(c, 90, 1384, w, 76, 38); c.fillStyle = st.dark ? '#25242a' : '#e9e5dc'; c.fill(); E.T(c, txt, 122, 1435, fnt, st.ink); c.restore();
+    }
+    const p2 = E.prog(t, s.animate, s.animate + .3);
+    if (p2 > 0) {
+      const txt = `${st.lab(n - 1)}: ${st.fmt(v[n - 1])}`, fnt = '600 38px Inter', w = E.tw(c, txt, fnt) + 64, sc = .85 + .15 * E.eback(p2);
+      c.save(); c.globalAlpha = E.clamp(p2 * 3); c.translate(90, 1510); c.scale(sc, sc);
+      E.rr(c, 0, -38, w, 76, 38); c.fillStyle = s.accent; c.fill(); E.T(c, txt, 32, 13, fnt, '#1a1405'); c.restore();
+    }
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "from": {
+    "name": "São Paulo",
+    "code": "GRU",
+    "lat": -23.435,
+    "lon": -46.473
+  },
+  "to": {
+    "name": "Lisboa",
+    "code": "LIS",
+    "lat": 38.774,
+    "lon": -9.134
+  }
+}

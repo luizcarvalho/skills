@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>/flight-path</title><script src="../../engine/core.js"></script></head>
+<body>
+<script>
+E.register({
+  defaults: {
+    locale: 'pt-BR',
+    duration: 6,
+    animate: 3.8,         // segundos de voo
+    tag: '/flight-path',
+    from: { name: 'Palmas', code: 'PMW', lat: -10.291, lon: -48.357 },
+    to: { name: 'Rio de Janeiro', code: 'GIG', lat: -22.81, lon: -43.251 },
+    distanceKm: null,     // null = calcula pela distância em linha reta (lat/lon)
+    durationMin: null,    // null = estima: distância / 780 km/h + 30 min de solo
+    units: 'km',          // km | mi
+    landedLabel: '✓ Pousou',
+    accent: '#ff8a2b',
+    colors: { bg: '#0e1322', card: '#141b2f', line: '#29324f', sub: '#8a9bc4' },
+  },
+  setup(s, E) {
+    const rad = d => d * Math.PI / 180;
+    const hav = (a, b) => { const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon); const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2; return 2 * 6371 * Math.asin(Math.sqrt(h)); };
+    const geo = s.from.lat != null && s.to.lat != null;
+    const km = s.distanceKm ?? (geo ? hav(s.from, s.to) : 1000);
+    const min = s.durationMin ?? Math.round(km / 780 * 60 + 30);
+    const dist = s.units === 'mi' ? km * .621371 : km;
+    // direção real no mapa (projeção equirretangular), encaixada na área livre da tela
+    let dx = .6, dy = .8;
+    if (geo) { const m = rad((s.from.lat + s.to.lat) / 2); dx = (s.to.lon - s.from.lon) * Math.cos(m); dy = -(s.to.lat - s.from.lat); const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
+    const cx = 540, cy = 1030, L = Math.min(Math.abs(dx) > 1e-3 ? 600 / Math.abs(dx) : 1e9, Math.abs(dy) > 1e-3 ? 560 / Math.abs(dy) : 1e9, 860);
+    const A = [cx - dx * L / 2, cy - dy * L / 2], B = [cx + dx * L / 2, cy + dy * L / 2];
+    let nx = dy, ny = -dx; if (ny > 0) { nx = -nx; ny = -ny; }
+    const C1 = [A[0] + dx * L * .1 + nx * L * .38, A[1] + dy * L * .1 + ny * L * .38], C2 = [B[0] - dx * L * .25 + nx * L * .3, B[1] - dy * L * .25 + ny * L * .3];
+    const bez = u => { const v = 1 - u; return [0, 1].map(i => v * v * v * A[i] + 3 * v * v * u * C1[i] + 3 * v * u * u * C2[i] + u * u * u * B[i]); };
+    const bezD = u => { const v = 1 - u; return [0, 1].map(i => 3 * v * v * (C1[i] - A[i]) + 6 * v * u * (C2[i] - C1[i]) + 3 * u * u * (B[i] - C2[i])); };
+    return { dist, min, A, B, bez, bezD };
+  },
+  draw(c, t, s, st, E) {
+    const col = s.colors, ac = s.accent;
+    c.fillStyle = col.bg; c.fillRect(0, 0, E.W, E.H);
+    c.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = 18; y < E.H; y += 36) for (let x = 18; x < E.W; x += 36) c.fillRect(x, y, 3, 3);
+    const p = E.eio(E.prog(t, .3, s.animate)), landed = E.prog(t, s.animate + .05, s.animate + .25);
+    c.save(); c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 3; c.setLineDash([10, 12]);
+    c.beginPath(); for (let i = 0; i <= 120; i++) { const q = st.bez(i / 120); i ? c.lineTo(...q) : c.moveTo(...q); } c.stroke(); c.restore();
+    if (p > 0) {
+      c.save(); c.strokeStyle = ac; c.lineWidth = 7; c.lineCap = 'round'; c.shadowColor = E.alpha(ac, .8); c.shadowBlur = 22;
+      c.beginPath(); const n = Math.max(1, Math.round(p * 200)); for (let i = 0; i <= n; i++) { const q = st.bez(p * i / n); i ? c.lineTo(...q) : c.moveTo(...q); } c.stroke(); c.restore();
+    }
+    const [A, B] = [st.A, st.B];
+    c.save(); c.strokeStyle = E.alpha(ac, .6); c.lineWidth = 3; E.circle(c, ...A, 32); c.stroke(); E.circle(c, ...A, 13); c.fillStyle = ac; c.fill();
+    c.strokeStyle = `rgba(255,255,255,${.5 * (1 - landed) + .25})`; E.circle(c, ...B, 34 + 22 * landed); c.stroke(); E.circle(c, ...B, 13); c.fillStyle = '#fff'; c.fill(); c.restore();
+    const label = (P, o) => { E.T(c, o.name, P[0], P[1] + 122, '700 46px Poppins', '#fff', 'center'); if (o.code) E.T(c, o.code, P[0], P[1] + 162, '500 32px Inter', col.sub, 'center'); };
+    label(A, s.from); label(B, s.to);
+    const hp = st.bez(p), d = st.bezD(Math.min(p, .999));
+    plane(c, hp[0], hp[1], Math.atan2(d[1], d[0]), 1.15);
+    // cartão
+    E.rr(c, 60, 300, 960, 300, 30); c.fillStyle = col.card; c.fill(); c.strokeStyle = col.line; c.lineWidth = 2.5; c.stroke();
+    const code = o => o.code || o.name.slice(0, 3).toUpperCase();
+    E.T(c, code(s.from), 110, 430, '700 84px Poppins', '#fff'); E.T(c, code(s.to), 972, 430, '700 84px Poppins', '#fff', 'right');
+    c.save(); c.strokeStyle = ac; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(512, 400); c.lineTo(552, 400); c.moveTo(538, 386); c.lineTo(553, 400); c.lineTo(538, 414); c.stroke(); c.restore();
+    E.T(c, `${E.num(Math.round(st.dist * p))} ${s.units}`, 110, 512, '500 44px Inter', '#dfe3ee');
+    const m = Math.round(st.min * p);
+    E.T(c, `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`, 972, 512, '500 44px Inter', '#dfe3ee', 'right');
+    E.rr(c, 110, 548, 862, 10, 5); c.fillStyle = '#28304b'; c.fill();
+    if (p > 0) { E.rr(c, 110, 548, 862 * p, 10, 5); c.fillStyle = ac; c.fill(); }
+    if (landed > 0 && s.landedLabel) {
+      const sc = E.eback(landed), f = '600 30px Inter', w = E.tw(c, s.landedLabel, f) + 40;
+      c.save(); c.translate(972 - w / 2, 314); c.scale(sc, sc); c.globalAlpha = E.clamp(landed * 3);
+      E.rr(c, -w / 2, -24, w, 48, 24); c.fillStyle = '#1d4a31'; c.fill(); E.T(c, s.landedLabel, 0, 11, f, '#63e08f', 'center'); c.restore();
+    }
+    E.tag(c, s.tag, true);
+  },
+});
+
+function plane(c, x, y, ang, s) {
+  c.save(); c.translate(x, y); c.rotate(ang); c.scale(s, s); c.fillStyle = '#fff';
+  c.beginPath(); c.moveTo(50, 0); c.quadraticCurveTo(46, -7, 32, -7); c.lineTo(-38, -5); c.lineTo(-46, 0); c.lineTo(-38, 5); c.lineTo(32, 7); c.quadraticCurveTo(46, 7, 50, 0); c.fill();
+  [-1, 1].forEach(k => {
+    c.beginPath(); c.moveTo(12, 5 * k); c.lineTo(-14, 46 * k); c.lineTo(-26, 46 * k); c.lineTo(-12, 5 * k); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-30, 4 * k); c.lineTo(-42, 20 * k); c.lineTo(-49, 20 * k); c.lineTo(-44, 3 * k); c.closePath(); c.fill();
+  });
+  c.restore();
+}
+</script>
+</body>
+</html>

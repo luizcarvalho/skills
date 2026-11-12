@@ -1,0 +1,17 @@
+{
+  "title": "Um pote de pasta de amendoim",
+  "count": 7,
+  "unit": "colheres de óleo",
+  "unitSingular": "colher de óleo",
+  "note": "Cerca de 100 g de gordura",
+  "container": {
+    "kind": "jar",
+    "label": "AMENDOIM",
+    "color": "#b5762f"
+  },
+  "item": {
+    "kind": "ball",
+    "color": "#f2c94c",
+    "shade": "#c99a1e"
+  }
+}

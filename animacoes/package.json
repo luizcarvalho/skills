@@ -1,0 +1,16 @@
+{
+  "name": "animacoes",
+  "version": "1.0.0",
+  "description": "Skills de animação em código para Reels/Shorts/TikTok (1080x1920), para Claude Code, Codex e outras IAs.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "demo": "bash scripts/demo.sh",
+    "render": "node engine/render.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0"
+  },
+  "engines": { "node": ">=18" }
+}

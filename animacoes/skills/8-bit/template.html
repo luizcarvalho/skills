@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>/8-bit</title><script src="../../engine/core.js"></script></head>
+<body>
+<script>
+// Sprites prontos: cada linha é uma fileira de pixels; cada letra é uma cor da paleta; "." é transparente.
+const SPRITES = {
+  lander: { pal: { G: '#9c9c9c', W: '#dcdcdc', B: '#2a2f45', Y: '#f2b632', O: '#d9861a' }, rows: [
+    '......GGGG......', '.....GWWWWG.....', '.....GWBBWG.....', '....GGWWWWGG....', '...GWWWWWWWWG...',
+    '..YYYYYYYYYYYY..', '..YOOOOOOOOOOY..', '..YYYYYYYYYYYY..', '..YOOOOOOOOOOY..', '..YYYYYYYYYYYY..',
+    '...G.G....G.G...', '..G...G..G...G..', '.G.....GG.....G.', 'GG............GG'] },
+  astronaut: { pal: { W: '#dcdcdc', B: '#2a2f45', G: '#9c9c9c' }, frames: [
+    ['.WWW..', 'WWBBW.', 'WWBBW.', '.WWW..', 'WWWWWW', 'WWWWWG', '.WWWW.', '.WWWW.', '.W..W.', '.W..W.'],
+    ['.WWW..', 'WWBBW.', 'WWBBW.', '.WWW..', 'WWWWWW', 'WWWWWG', '.WWWW.', '.WWWW.', '.WW.W.', 'W...W.']] },
+  rocket: { pal: { W: '#e8e8e8', R: '#e0413a', B: '#3b7bd6', G: '#9c9c9c' }, rows: [
+    '...RR...', '..RRRR..', '..WWWW..', '..WBBW..', '..WBBW..', '..WWWW..', '..WWWW..', '.RWWWWR.', 'RRWWWWRR', 'RR.GG.RR'] },
+  ufo: { pal: { G: '#9ad14b', W: '#dcdcdc', D: '#7a7a7a', Y: '#ffe27a' }, rows: [
+    '....GGGG....', '...GGGGGG...', '.WWWWWWWWWW.', 'WDWDWDWDWDWW', '.WWWWWWWWWW.', '..Y..Y..Y...'] },
+  'flag-brasil': { pixel: 6, pal: { G: '#1f9e45', Y: '#f7d417', B: '#1f3fa0', W: '#ffffff' }, rows: [
+    'GGGGGGGGGGGGG', 'GGGGGGYGGGGGG', 'GGGGYYYYYGGGG', 'GGYYYBBBYYYGG', 'GYYYBWWWBYYYG', 'GGYYYBBBYYYGG', 'GGGGYYYYYGGGG', 'GGGGGGYGGGGGG', 'GGGGGGGGGGGGG'] },
+  'flag-eua': { pixel: 6, pal: { B: '#2a3a8f', R: '#e0413a', W: '#ffffff' }, rows: [
+    'BBBBRRRRRRRRR', 'BWBBWWWWWWWWW', 'BBBBRRRRRRRRR', 'BWBBWWWWWWWWW', 'RRRRRRRRRRRRR', 'WWWWWWWWWWWWW', 'RRRRRRRRRRRRR', 'WWWWWWWWWWWWW', 'RRRRRRRRRRRRR'] },
+  'flag-portugal': { pixel: 6, pal: { G: '#1f7a3a', R: '#d8262e', Y: '#f7d417' }, rows: [
+    'GGGGGRRRRRRRR', 'GGGGGRRRRRRRR', 'GGGGGRRRRRRRR', 'GGGGYYRRRRRRR', 'GGGYYYYRRRRRR', 'GGGGYYRRRRRRR', 'GGGGGRRRRRRRR', 'GGGGGRRRRRRRR', 'GGGGGRRRRRRRR'] },
+};
+
+E.register({
+  defaults: {
+    locale: 'pt-BR',
+    duration: 6,
+    tag: '/8-bit',
+    title: '1969',                 // texto grande no topo (fonte pixel)
+    caption: 'UM PEQUENO PASSO',   // digitado letra a letra no chão (null para esconder)
+    captionAt: 1.7,
+    colors: { sky: '#020516', title: '#f6c744', ground: '#8f8f8f', groundTop: '#b4b4b4', crater: '#6b6b6b', caption: '#ececec' },
+    stars: 150,
+    planet: { kind: 'earth', x: 836, y: 470, size: 208 }, // kind: earth | moon | sun | mars | null
+    groundY: 1300,
+    craters: true,
+    // Atores: sprite + trajeto [[t, x, y], ...] (x,y = canto superior esquerdo; y "ground" = apoiado no chão).
+    // Opções: flame (fogo embaixo enquanto se move), dust (poeira ao chegar), walk (anima passos), pole (mastro de bandeira).
+    actors: [
+      { sprite: 'lander', path: [[0, 416, 560], [1.3, 416, 'ground']], flame: true, dust: true },
+      { sprite: 'astronaut', appear: 1.5, path: [[1.5, 536, 'ground'], [2.5, 640, 'ground']], walk: true },
+      { sprite: 'flag-brasil', appear: 2.7, path: [[2.7, 760, 'ground']], pole: true },
+    ],
+    sprites: {},                   // seus próprios sprites, mesmo formato de SPRITES acima
+    pixel: 8,
+  },
+  setup(s, E) {
+    const sp = { ...SPRITES, ...s.sprites };
+    const R = E.rng(3), stars = []; for (let i = 0; i < s.stars; i++) stars.push([Math.floor(R() * 135) * 8, Math.floor(R() * (s.groundY / 8 - 4)) * 8, R() < .2 ? 8 : 4, R(), R() * 6]);
+    const gt = []; for (let x = 0; x < 1080; x += 48) gt.push(s.groundY + [-8, 0, 0, 8][Math.floor(R() * 4)]);
+    let planet = null;
+    if (s.planet && s.planet.kind) {
+      const n = 26, cv = document.createElement('canvas'); cv.width = cv.height = n; const g = cv.getContext('2d');
+      const P = { earth: ['#2f70da', '#1c4ca0', '#45ab4c', '#2b7a36'], moon: ['#bdbdbd', '#8a8a8a', '#9e9e9e', '#767676'], sun: ['#ffd23f', '#f2a417', '#ffe27a', '#f7b928'], mars: ['#d2643a', '#9c3f20', '#b8532e', '#86361c'] }[s.planet.kind] || ['#2f70da', '#1c4ca0', '#45ab4c', '#2b7a36'];
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const dx = x - 12.5, dy = y - 12.5, d = Math.hypot(dx, dy); if (d > 12.7) continue;
+        const land = Math.sin(x * .8 + y * .35) * Math.cos(y * .62 - x * .28) + .5 * Math.sin((x + y) * .45) > .32;
+        const dark = (dx * .6 + dy * .45) / 12 > .3 || d > 11.8;
+        g.fillStyle = land ? (dark ? P[3] : P[2]) : (dark ? P[1] : P[0]); g.fillRect(x, y, 1, 1);
+      }
+      planet = cv;
+    }
+    return { sp, stars, gt, planet };
+  },
+  draw(c, t, s, st, E) {
+    const col = s.colors, G = s.groundY, PX = s.pixel;
+    c.fillStyle = col.sky; c.fillRect(0, 0, E.W, E.H);
+    st.stars.forEach(([x, y, z, a, ph]) => { c.fillStyle = `rgba(255,255,255,${(.35 + .65 * a) * (.7 + .3 * Math.sin(t * 4 + ph))})`; c.fillRect(x, y, z, z); });
+    E.tag(c, s.tag, true);
+    if (s.title) { c.save(); c.letterSpacing = '-18px'; E.T(c, s.title, 66, 470, '400 168px Silkscreen', col.title); c.restore(); }
+    if (st.planet) { c.save(); c.imageSmoothingEnabled = false; c.drawImage(st.planet, s.planet.x - s.planet.size / 2, s.planet.y - s.planet.size / 2, s.planet.size, s.planet.size); c.restore(); }
+    // chão
+    c.fillStyle = col.ground; c.beginPath(); c.moveTo(0, E.H); st.gt.forEach((y, i) => { c.lineTo(i * 48, y); c.lineTo(i * 48 + 48, y); }); c.lineTo(E.W, E.H); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = G - 8; y < E.H; y += 16) c.fillRect(0, y, E.W, 8);
+    c.fillStyle = col.groundTop; st.gt.forEach((y, i) => c.fillRect(i * 48, y, 48, 8));
+    if (s.craters) [[110, 70, 72], [430, 250, 48], [770, 90, 80], [940, 300, 56], [280, 360, 40]].forEach(([x, dy, w]) => { c.fillStyle = col.crater; c.fillRect(x, G + dy, w, 16); c.fillStyle = col.groundTop; c.fillRect(x + 8, G + dy + 16, w - 8, 8); });
+    // atores
+    s.actors.forEach(a => {
+      if (a.appear != null && t < a.appear) return;
+      const spr = st.sp[a.sprite]; if (!spr) return;
+      const rows = spr.frames ? spr.frames[0] : spr.rows, px = spr.pixel || PX, h = rows.length * px;
+      const Y = v => v === 'ground' ? G - h - (a.pole ? 15 * PX - h : 0) : v;
+      const path = a.path.map(([tt, x, y]) => [tt, x, Y(y)]);
+      let x = path[0][1], y = path[0][2], moving = false;
+      for (let i = 0; i < path.length - 1; i++) {
+        const [t0, x0, y0] = path[i], [t1, x1, y1] = path[i + 1];
+        if (t >= t0 && t <= t1) { const q = E.eout(E.prog(t, t0, t1)); x = E.lerp(x0, x1, q); y = E.lerp(y0, y1, q); moving = t < t1; break; }
+        if (t > t1) { x = x1; y = y1; }
+      }
+      const end = path[path.length - 1][0];
+      if (a.flame && moving) { const R = E.rng(Math.floor(t * 30) + 1), w = (rows[0].length * px); for (let i = 0; i < 6; i++) { c.fillStyle = R() < .5 ? '#ffb22e' : '#ffe27a'; c.fillRect(x + w / 2 - 16 + Math.floor(R() * 4) * PX, y + h + Math.floor(R() * 4) * PX, PX, PX); } }
+      if (a.dust) { const dp = E.prog(t, end, end + .45); if (dp > 0 && dp < 1) { c.fillStyle = `rgba(190,190,190,${1 - dp})`; const w = rows[0].length * px; for (let i = 0; i < 5; i++) { const o = 40 + dp * 140 + i * 18; c.fillRect(x + w / 2 - o, G - 16 - i % 2 * 8, PX, PX); c.fillRect(x + w / 2 + o, G - 16 - i % 2 * 8, PX, PX); } } }
+      if (a.pole) {
+        const fp = E.eout(E.prog(t, a.appear ?? 0, (a.appear ?? 0) + .2)), top = G - Math.round(15 * fp) * PX;
+        c.fillStyle = '#e8e8e8'; c.fillRect(x, top, PX, G - top);
+        if (fp >= 1) sprite(c, rows, spr.pal, x + PX, top, px);
+        return;
+      }
+      const fr = spr.frames && a.walk && moving ? spr.frames[Math.floor(t * 8) % spr.frames.length] : rows;
+      sprite(c, fr, spr.pal, x, y, px);
+    });
+    if (s.caption) {
+      const k = Math.floor(E.clamp((t - s.captionAt) / .07, 0, s.caption.length));
+      if (k > 0) {
+        c.font = '400 62px Silkscreen'; const full = Math.min(c.measureText(s.caption).width, 940), sc = Math.min(1, 940 / c.measureText(s.caption).width);
+        const f = `400 ${Math.floor(62 * sc)}px Silkscreen`;
+        E.T(c, s.caption.slice(0, k), 540 - full / 2 + 4, G + 184, f, 'rgba(0,0,0,0.35)');
+        E.T(c, s.caption.slice(0, k), 540 - full / 2, G + 180, f, col.caption);
+      }
+    }
+  },
+});
+function sprite(c, rows, pal, x, y, p) {
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.' && pal[ch]) { c.fillStyle = pal[ch]; c.fillRect(Math.round(x + i * p), Math.round(y + j * p), p, p); } }));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "title": "1965",
+  "caption": "DECOLAGEM",
+  "planet": {
+    "kind": "sun",
+    "x": 840,
+    "y": 470,
+    "size": 180
+  },
+  "colors": {
+    "sky": "#0b1033",
+    "ground": "#6f8f4a",
+    "groundTop": "#8fb35e",
+    "crater": "#5a7a3a"
+  },
+  "craters": false,
+  "actors": [
+    {
+      "sprite": "flag-brasil",
+      "appear": 0.2,
+      "path": [
+        [
+          0.2,
+          180,
+          "ground"
+        ]
+      ],
+      "pole": true
+    },
+    {
+      "sprite": "rocket",
+      "path": [
+        [
+          0,
+          500,
+          "ground"
+        ],
+        [
+          0.8,
+          500,
+          "ground"
+        ],
+        [
+          3.2,
+          500,
+          -200
+        ]
+      ],
+      "flame": true
+    }
+  ]
+}
